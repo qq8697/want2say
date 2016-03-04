@@ -1,0 +1,198 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>刮刮卡</title>
+		<meta name="viewport" content="width=device-width,height=height-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+		<style>
+			*{
+				margin:0 0;
+				padding: 0 0;
+			}
+		</style>
+	</head>
+	<body>
+		
+		<canvas id="canvas"></canvas>
+		<script>
+
+			document.addEventListener("DOMContentLoaded",main);
+
+			function main(){
+				//console.log("DOMContentLoaded");
+				document.body.style.webkitUserSelect=document.body.style.mozUserSelect="none";
+
+				var requestAnimationFrame=window.requestAnimationFrame||window.mozRequestAnimationFrame||window.webkitRequestAnimationFrame||window.msRequestAnimationFrame||window.oRequestAnimationFrame;
+
+				var canvas=document.getElementById("canvas");
+
+				var front=new Image(),
+					back=new Image(),
+					imgLoaded=0;
+				front.src="front.jpg";
+				back.src="back.jpg";
+				front.addEventListener("load",loadImg);
+				back.addEventListener("load",loadImg);
+
+				function loadImg(){
+					if(++imgLoaded==2){
+						//console.log("已加载完两张图片");
+						renderCanvas(canvas,back,front,800,500);
+					}
+				}
+
+				function renderCanvas(canvas,back,front,width,height){
+					var ctx=canvas.getContext('2d'),
+						eventList=[],
+						listener=[
+							bind(canvas,"touchstart",'mousedown',downHandle),
+							bind(document,'touchmove','mousemove',moveHandle),
+							bind(document,'touchend','mouseup',upHandle)
+						],
+
+						drawCanvas=document.createElement('canvas'),
+						tempCanvas=document.createElement('canvas'),
+						drawCtx=drawCanvas.getContext('2d'),
+						tempCtx=tempCanvas.getContext('2d');
+
+					drawCanvas.width=tempCanvas.width=canvas.width=width;
+					drawCanvas.height=tempCanvas.height=canvas.height=height;
+
+					drawCtx.strokeStyle="black";
+					drawCtx.lineWidth=30;
+					drawCtx.lineCap=drawCtx.lineJoin='round';
+
+					var mousedown=false,
+					lastPoint=null;
+					
+					function render(){
+						tempCtx.drawImage(drawCanvas,0,0);
+						tempCtx.save();
+						tempCtx.globalCompositeOperation="source-atop";
+						tempCtx.drawImage(back,0,0);
+						tempCtx.restore();
+
+						ctx.drawImage(front,0,0);
+						ctx.drawImage(tempCanvas,0,0);
+					}
+
+					function downHandle(e){
+						e.preventDefault();
+						mousedown=true;
+						if(e.changedTouches){
+							e=e.changedTouches[e.changedTouches.length-1];
+						}
+						var x=(e.pageX||e.clientX+document.body.scrollLeft)-canvas.offsetLeft||0,
+							y=(e.pageY||e.clientY+document.body.scrollTop)-canvas.offsetTop||0;
+						//console.log("x的坐标："+x+"  y的坐标："+y);
+						lastPoint={
+							'x':x,
+							'y':y
+						}
+						render();
+					}
+
+					function moveHandle(e){
+						e.preventDefault();
+						if(mousedown){
+							if(e.changedTouches){
+								e=e.changedTouches[e.changedTouches.length-1];
+							}
+							var x=(e.pageX||e.clientX+document.body.scrollLeft)-canvas.offsetLeft||0,
+								y=(e.pageY||e.clientY+document.body.scrollTop)-canvas.offsetTop||0;
+							if(lastPoint){
+								drawCtx.beginPath();
+								drawCtx.moveTo(lastPoint.x,lastPoint.y);
+							}
+							drawCtx.lineTo(x,y);
+							drawCtx.stroke();
+							lastPoint={
+								'x':x,
+								'y':y
+							}
+							render();
+						}
+					}
+
+					function upHandle(e){
+						e.preventDefault();
+						mousedown=false;
+						lastPoint=null;
+
+						var result=(function(){
+							var data=drawCtx.getImageData(0,0,drawCanvas.width,drawCanvas.height).data;
+							for(var i=0,j=0;i<data.length;i+=4){
+								if(data[i+3]){
+									j++;
+								}
+							}
+							return j/(drawCanvas.width*drawCanvas.height);
+						})();
+						console.log("result的值为："+result);
+						if(result>0.4){
+							end(2000);
+						}
+					}
+
+					render();
+					
+					function end(ms){
+						for(var i=0;i<listener.length;i++){
+							listener[i].destory();
+						}
+						if(ms){
+							var startTime=new Date().getTime();
+							ctx.globalAlpha=0;
+							requestAnimationFrame(animate);
+							//console.log("requestAnimationFrame已执行");
+						}else{
+							ctx.drawImage(back,0,0);
+						}
+						//var times=0;
+						function animate(){
+							//console.log("animate函数的执行次数"+times++);
+							var pastTime=new Date().getTime()-startTime;
+							render();
+							ctx.save();
+							ctx.globalAlpha=pastTime/ms;
+							ctx.drawImage(back,0,0);
+							ctx.restore();
+							
+							if(pastTime<ms){
+								requestAnimationFrame(animate);
+							}
+						}
+					}
+				}
+
+				function bind(){
+					var args=[].slice.call(arguments),
+						element=index(args,0),
+						events=args.slice(1,-1),
+						handle=index(args,-1);
+
+					/*console.log(element);
+					console.log(events);
+					console.log(handle);*/
+
+					for(var i=0;i<events.length;i++){
+						element.addEventListener(events[i],handle);
+					}
+
+					return {
+						destory:function(){
+							for(var i=0;i<events.length;i++){
+								element.removeEventListener(events[i],handle);
+							}
+						}
+					}
+				}
+
+				function index(arr,index){
+					return index<0?arr[arr.length-1]:arr[0];
+				}
+
+			}
+		</script>
+	</body>
+</html>
